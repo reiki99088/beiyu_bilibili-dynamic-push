@@ -62,8 +62,15 @@ FONT_NAME_BOLD = True   # 名称使用粗体
 LINE_SPACING = 14         # 行与行之间额外间距
 TEXT_LINE_HEIGHT = 38     # 正文行高（字号 + spacing）
 
-# 头像缓存目录
-AVATAR_CACHE_DIR = os.path.join(os.path.dirname(__file__), "assets", "avatar_cache")
+# 头像缓存目录（由 set_avatar_cache_dir 设置，默认回退到插件目录）
+_avatar_cache_dir: str = os.path.join(os.path.dirname(__file__), "assets", "avatar_cache")
+
+
+def set_avatar_cache_dir(path: str):
+    """设置头像缓存目录"""
+    global _avatar_cache_dir
+    _avatar_cache_dir = path
+    os.makedirs(_avatar_cache_dir, exist_ok=True)
 
 # ================ 预编译正则 ================
 _EMOJI_RE = re.compile(
@@ -224,10 +231,10 @@ async def _download_and_cache_avatar(
         if os.path.exists(cached_path):
             return cached_path
 
-    os.makedirs(AVATAR_CACHE_DIR, exist_ok=True)
+    os.makedirs(_avatar_cache_dir, exist_ok=True)
 
     safe_uid = uid if uid else hashlib.md5(face_url.encode()).hexdigest()
-    cache_path = os.path.join(AVATAR_CACHE_DIR, f"{safe_uid}.jpg")
+    cache_path = os.path.join(_avatar_cache_dir, f"{safe_uid}.jpg")
 
     if os.path.exists(cache_path):
         mtime = os.path.getmtime(cache_path)

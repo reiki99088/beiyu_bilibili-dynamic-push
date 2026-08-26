@@ -16,6 +16,16 @@ from bilibili_api import user
 
 logger = logging.getLogger("bilibili_dynamic_push")
 
+# 运行数据目录，由 monitor.start() 通过 set_data_dir() 设置
+_data_dir: str = os.path.dirname(__file__)
+
+
+def set_data_dir(path: str):
+    """设置持久化数据目录（history.json 等）"""
+    global _data_dir
+    _data_dir = path
+    os.makedirs(_data_dir, exist_ok=True)
+
 
 async def fetch_uname(uid: str, credential) -> str:
     """根据 UID 拉取 B 站昵称，失败返回空串"""
@@ -53,7 +63,7 @@ class BiliUtils:
 
     @staticmethod
     def get_history_path() -> str:
-        return os.path.join(os.path.dirname(__file__), "history.json")
+        return os.path.join(_data_dir, "history.json")
 
     @staticmethod
     def load_history() -> Dict[str, Any]:

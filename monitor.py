@@ -125,6 +125,25 @@ class BiliMonitor:
         self.ctx = ctx
         self.config = config
 
+        # 设置运行数据目录到 SDK 分配的持久化/临时目录
+        try:
+            data_dir = str(ctx.paths.data_dir)
+            runtime_dir = str(ctx.paths.runtime_dir)
+        except Exception:
+            # 兼容旧版 SDK 无 paths 的情况，回退到插件目录
+            data_dir = os.path.dirname(__file__)
+            runtime_dir = os.path.dirname(__file__)
+
+        from .utils import set_data_dir
+        set_data_dir(data_dir)
+        sub_manager.set_data_dir(data_dir)
+
+        from .image_composer import set_avatar_cache_dir
+        set_avatar_cache_dir(os.path.join(runtime_dir, "avatar_cache"))
+
+        # 迁移后重新加载历史和订阅
+        self.history = BiliUtils.load_history()
+
         if not self.session or self.session.closed:
             self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
 

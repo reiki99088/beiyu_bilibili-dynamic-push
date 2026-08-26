@@ -12,9 +12,17 @@ import asyncio
 
 class SubscriptionManager:
     def __init__(self):
-        self.file_path = os.path.join(os.path.dirname(__file__), "subscriptions.json")
+        self._data_dir: str = os.path.dirname(__file__)
+        self.file_path = os.path.join(self._data_dir, "subscriptions.json")
         self.lock = asyncio.Lock()
         self.data = {"static": {}, "custom": {}, "names": {}}
+        self._load_sync()
+
+    def set_data_dir(self, path: str):
+        """设置持久化数据目录"""
+        self._data_dir = path
+        self.file_path = os.path.join(path, "subscriptions.json")
+        os.makedirs(path, exist_ok=True)
         self._load_sync()
 
     def _load_sync(self):
