@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Plugin runtime generated files
+config.toml
+history.json
+subscriptions.json
+config_back/
+
+# Avatar cache (auto-generated)
+assets/avatar_cache/
+
+# Test output
+test.png
+assets/test_*.png
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
