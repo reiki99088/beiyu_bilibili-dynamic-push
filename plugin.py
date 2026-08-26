@@ -130,6 +130,7 @@ class BiliPlugin(MaiBotPlugin):
     async def handle_bili_fans(self, matched_groups: dict = None, **kwargs) -> tuple:
         # ---- 取 group_id（复用 handle_bili_control 的逻辑） ----
         base_info = kwargs.get("message_base_info", {})
+        current_user = kwargs.get("user_id") or base_info.get("user_info", {}).get("user_id")
         group_id = kwargs.get("group_id")
         if not group_id and "raw_event" in kwargs:
             raw_event = kwargs["raw_event"]
@@ -141,6 +142,12 @@ class BiliPlugin(MaiBotPlugin):
             group_id = base_info.get("group_id")
         if not group_id:
             return False, "请在群聊内使用 /bili fans", True
+
+        # 管理员校验
+        admin_list = [str(x) for x in self.config.settings.admin_qqs]
+        if current_user not in admin_list:
+            self.ctx.logger.warning(f"⚠️ 非管理员尝试执行指令: {current_user}")
+            return False, None, False
 
         async def reply_group(text: str):
             try:
