@@ -22,14 +22,9 @@ ENV/
 *.swo
 *~
 
-# Plugin runtime generated files
+# Plugin runtime generated files (now stored in data_dir, not plugin dir)
 config.toml
-history.json
-subscriptions.json
 config_back/
-
-# Avatar cache (auto-generated)
-assets/avatar_cache/
 
 # Test output
 test.png

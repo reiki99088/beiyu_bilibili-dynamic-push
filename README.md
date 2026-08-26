@@ -134,27 +134,30 @@ users = [
 ## 文件结构
 
 ```
-beiyu_bilibili-dynamic-push/
-├── __init__.py              # 包入口
-├── plugin.py                # 插件主类与命令注册
-├── config.py                # 配置模型（pydantic / WebUI schema）
-├── monitor.py               # 核心监控逻辑（动态 / 直播 / 粉丝 / 视频处理）
-├── commands.py              # /bili 系列指令实现
-├── subscription.py          # 订阅管理器（静态 + 动态）
-├── utils.py                 # 工具函数（图片转码、历史持久化等）
-├── image_composer.py        # 动态合成图片生成器（头像+文案+图片网格）
-├── _manifest.json           # 插件清单文件
-├── requirements.txt         # Python 依赖
-├── assets/                  # 静态资源
-│   ├── bilibili.png         # 插件图标
-│   ├── avatar_source.png    # 默认头像源图
-│   └── avatar_cache/        # UP 主头像缓存目录（自动生成）
-├── config.toml              # [自动生成] 配置文件
-├── history.json             # [自动生成] 动态/直播/粉丝历史记录，用于去重
-└── subscriptions.json       # [自动生成] 指令添加的订阅信息
+beiyu_bilibili-dynamic-push/          # 插件源码目录（只读）
+├── __init__.py                        # 包入口
+├── plugin.py                          # 插件主类与命令注册
+├── config.py                          # 配置模型（pydantic / WebUI schema）
+├── monitor.py                         # 核心监控逻辑（动态 / 直播 / 粉丝 / 视频处理）
+├── commands.py                        # /bili 系列指令实现
+├── subscription.py                    # 订阅管理器（静态 + 动态）
+├── utils.py                           # 工具函数（图片转码、历史持久化等）
+├── image_composer.py                  # 动态合成图片生成器（头像+文案+图片网格）
+├── _manifest.json                     # 插件清单文件
+├── requirements.txt                   # Python 依赖
+└── assets/                            # 静态资源
+    ├── bilibili.png                   # 插件图标
+    └── avatar_source.png              # 默认头像源图
+
+data/plugins/beiyu.bilibili-dynamic-push/   # 持久化数据目录
+├── history.json                       # 动态/直播/粉丝历史记录，用于去重
+└── subscriptions.json                 # 指令添加的订阅信息
+
+temp/plugins/beiyu.bilibili-dynamic-push/  # 临时数据目录
+└── avatar_cache/                      # UP 主头像缓存（重启可清）
 ```
 
-> `history.json` 与 `subscriptions.json` 由插件自动维护，**请勿手动修改**。
+> `history.json` 与 `subscriptions.json` 由插件自动维护，位于 SDK 分配的 `data_dir` 目录，**请勿手动修改**。
 
 ---
 
