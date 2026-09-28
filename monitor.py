@@ -537,14 +537,140 @@ class BiliMonitor:
 
         if not img_bytes:
             self.ctx.logger.error("❌ 图片合成失败，尝试使用旧方式发送")
-            # 降级：使用旧的文本+图片方式
             await self._push_legacy(parsed, group_ids, max_imgs)
-            return
+        else:
+            # 转换为base64
+            b64_str = base64.b64encode(img_bytes).decode("utf-8")
 
-        # 转换为base64
-        b64_str = base64.b64encode(img_bytes).decode("utf-8")
+            # 发送合成图片
+            for gid in group_ids:
+                try:
+                    await self.ctx.api.call(
+                        "adapter.napcat.message.send_msg",
+                        params={
+                            "message_type": "group",
+                            "group_id": gid,
+                            "message": [
+                                {"type": "image", "data": {"file": f"base64://{b64_str}"}},
+                            ],
+                        },
+                    )
+                    await asyncio.sleep(0.5)
+                except Exception as e:
+                    self.ctx.logger.error(f"发送合成图片失败: {e}")
 
-        # 发送合成图片
+            # 非视频动态附送原图；少量图片合成一个消息，超过阈值合并转发。
+            if not video_info and images:
+                await self._push_original_images(images, group_ids, max_imgs, author)
+
+        if video_info:
+            settings = getattr(self.config, "settings", None)
+            send_video_file = getattr(settings, "send_video_file", True)
+            if send_video_file:
+                self.ctx.logger.info("🎬 视频动态将在后台下载并发送视频文件")
+                asyncio.create_task(
+                    self._process_video_dynamic(video_info, author, group_ids)
+                )
+            else:
+                await self._push_video_link(video_info, author, url, group_ids)
+
+    async def _push_original_images(
+        self, images: List[str], group_ids: List[int], max_imgs: int, author: str,
+    ):
+        """将原始图片作为单条图文消息发送，超阈值时改为合并转发。"""
+        tmp_dir = tempfile.mkdtemp(prefix="bili_imgs_")
+        downloaded = []
+        try:
+            for index, img_url in enumerate(images):
+                try:
+                    img_data = await self._download_url(img_url)
+                    if not img_data:
+                        continue
+
+                    url_path = img_url.split("?", 1)[0].lower()
+                    ext = os.path.splitext(url_path)[1]
+                    if ext not in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
+                        ext = ".jpg"
+                    tmp_file = os.path.join(tmp_dir, f"img_{index}{ext}")
+                    with open(tmp_file, "wb") as image_file:
+                        image_file.write(img_data)
+                    downloaded.append((tmp_file, img_data))
+                except Exception as e:
+                    self.ctx.logger.error(f"下载原始图片失败: {e}")
+
+            if not downloaded:
+                return
+
+            try:
+                threshold = max(0, int(max_imgs))
+            except (TypeError, ValueError):
+                threshold = 3
+
+            if len(downloaded) > threshold:
+                forward_nodes = [
+                    {
+                        "type": "node",
+                        "data": {
+                            "name": author,
+                            "uin": "10000",
+                            "content": [
+                                {
+                                    "type": "image",
+                                    "data": {
+                                        "file": f"base64://{base64.b64encode(img_data).decode('utf-8')}"
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                    for _, img_data in downloaded
+                ]
+                for gid in group_ids:
+                    try:
+                        await self.ctx.api.call(
+                            "adapter.napcat.message.send_group_forward_msg",
+                            params={"group_id": gid, "message": forward_nodes},
+                        )
+                        await asyncio.sleep(0.5)
+                    except Exception as e:
+                        self.ctx.logger.error(f"发送原始图片合并转发到群 {gid} 失败: {e}")
+            else:
+                message_chain = [
+                    {"type": "image", "data": {"file": os.path.abspath(path)}}
+                    for path, _ in downloaded
+                ]
+                for gid in group_ids:
+                    try:
+                        await self.ctx.api.call(
+                            "adapter.napcat.message.send_msg",
+                            params={
+                                "message_type": "group",
+                                "group_id": gid,
+                                "message": message_chain,
+                            },
+                        )
+                        await asyncio.sleep(0.5)
+                    except Exception as e:
+                        self.ctx.logger.error(f"发送原始图片到群 {gid} 失败: {e}")
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    async def _push_video_link(
+        self, video_info: Dict, author: str, dynamic_url: str, group_ids: List[int],
+    ):
+        """仅发送视频/动态链接，不下载视频流或调用 ffmpeg。"""
+        bvid = str(video_info.get("bvid") or "").strip()
+        aid = str(video_info.get("aid") or "").strip()
+        title = str(video_info.get("title") or "视频投稿").strip()
+        video_id = bvid or (f"av{aid}" if aid else "")
+
+        message_lines = [f"🎬 【{author}】视频投稿：{title}"]
+        if video_id:
+            message_lines.append(f"🔗 视频链接：https://www.bilibili.com/video/{video_id}")
+        if dynamic_url:
+            message_lines.append(f"📝 动态链接：{dynamic_url}")
+        message = "\n".join(message_lines)
+
         for gid in group_ids:
             try:
                 await self.ctx.api.call(
@@ -552,66 +678,12 @@ class BiliMonitor:
                     params={
                         "message_type": "group",
                         "group_id": gid,
-                        "message": [
-                            {"type": "image", "data": {"file": f"base64://{b64_str}"}},
-                        ],
+                        "message": [{"type": "text", "data": {"text": message}}],
                     },
                 )
                 await asyncio.sleep(0.5)
             except Exception as e:
-                self.ctx.logger.error(f"发送合成图片失败: {e}")
-
-        # 非视频动态：额外发送原始图片（逐张发送，用本地文件路径避免帧大小限制）
-        if not video_info and images:
-            self.ctx.logger.info(f"📸 发送原始图片: {len(images)} 张")
-            import tempfile as _tmp_mod
-            tmp_dir = _tmp_mod.mkdtemp(prefix="bili_imgs_")
-            try:
-                for img_url in images:
-                    try:
-                        img_data = await self._download_url(img_url)
-                        if not img_data:
-                            continue
-                        ext = ".jpg"
-                        if ".png" in img_url:
-                            ext = ".png"
-                        elif ".gif" in img_url:
-                            ext = ".gif"
-                        elif ".webp" in img_url:
-                            ext = ".webp"
-                        tmp_file = os.path.join(tmp_dir, f"img_{images.index(img_url)}{ext}")
-                        with open(tmp_file, "wb") as f:
-                            f.write(img_data)
-
-                        for gid in group_ids:
-                            try:
-                                await self.ctx.api.call(
-                                    "adapter.napcat.message.send_msg",
-                                    params={
-                                        "message_type": "group",
-                                        "group_id": gid,
-                                        "message": [
-                                            {"type": "image", "data": {"file": os.path.abspath(tmp_file)}},
-                                        ],
-                                    },
-                                )
-                                await asyncio.sleep(0.5)
-                            except Exception as e:
-                                self.ctx.logger.error(f"发送原始图片失败: {e}")
-                    except Exception as e:
-                        self.ctx.logger.error(f"下载/发送图片失败: {e}")
-            finally:
-                # 清理临时目录
-                if os.path.exists(tmp_dir):
-                    shutil.rmtree(tmp_dir, ignore_errors=True)
-
-        # 视频动态：后台异步处理，不阻塞命令响应
-        if video_info:
-            self.ctx.logger.info(f"🎬 视频动态将在后台处理，不阻塞当前请求")
-            # 使用 create_task 在后台运行视频处理
-            asyncio.create_task(
-                self._process_video_dynamic(video_info, author, group_ids)
-            )
+                self.ctx.logger.error(f"发送视频链接到群 {gid} 失败: {e}")
 
     async def _push_legacy(self, parsed: Dict, group_ids: List[int], max_imgs: int):
         """降级方案：使用旧的文本+图片方式"""

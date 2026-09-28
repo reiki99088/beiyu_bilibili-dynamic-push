@@ -159,6 +159,14 @@ class SettingsSection(PluginConfigBase):
             "order": 7,
         },
     )
+    send_video_file: bool = Field(
+        default=True,
+        json_schema_extra={
+            "hint": "开启后下载并发送视频文件（需要 ffmpeg）；关闭后只发送 B 站视频和动态链接。",
+            "label": "发送视频文件",
+            "order": 8,
+        },
+    )
 
 
 class SubscriptionsSection(PluginConfigBase):
